@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>WorkBoard</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main class="shell">
+      <section class="auth-view" id="authView">
+        <div class="brand">
+          <p class="eyebrow">Team Task Manager</p>
+          <h1>WorkBoard</h1>
+          <p>Project planning, team assignment, task status tracking, overdue visibility, and role-based access in one deployable app.</p>
+          <div class="feature-strip">
+            <span>Signup/Login</span>
+            <span>Admin/Member RBAC</span>
+            <span>REST APIs</span>
+            <span>SQL database</span>
+            <span>Railway ready</span>
+          </div>
+        </div>
+
+        <div class="auth-panel">
+          <div class="tabs">
+            <button class="tab active" id="loginTab" type="button">Login</button>
+            <button class="tab" id="signupTab" type="button">Member signup</button>
+          </div>
+
+          <form id="loginForm" class="form">
+            <label>Email <input name="email" type="email" autocomplete="email" required></label>
+            <label>Password <input name="password" type="password" autocomplete="current-password" required></label>
+            <button type="submit">Login</button>
+          </form>
+
+          <form id="signupForm" class="form hidden">
+            <label>Name <input name="name" type="text" autocomplete="name" required minlength="2"></label>
+            <label>Email <input name="email" type="email" autocomplete="email" required></label>
+            <label>Password <input name="password" type="password" autocomplete="new-password" required minlength="6"></label>
+            <button type="submit">Create member account</button>
+          </form>
+        </div>
+      </section>
+
+      <section class="app-view hidden" id="appView">
+        <aside class="sidebar">
+          <div>
+            <p class="eyebrow">WorkBoard</p>
+            <h1 id="welcomeTitle">Workspace</h1>
+            <span class="role-pill" id="rolePill"></span>
+          </div>
+          <nav class="nav">
+            <button class="nav-button active" data-view="dashboard" type="button">Dashboard</button>
+            <button class="nav-button" data-view="projects" type="button">Projects</button>
+            <button class="nav-button" data-view="tasks" type="button">Tasks</button>
+            <button class="nav-button" data-view="team" type="button">Team</button>
+          </nav>
+          <button class="ghost" id="logoutButton" type="button">Logout</button>
+        </aside>
+
+        <section class="main-panel">
+          <header class="content-head">
+            <div>
+              <p class="eyebrow" id="viewEyebrow">Dashboard</p>
+              <h2 id="viewTitle">Overview</h2>
+            </div>
+            <button id="primaryAction" type="button">New project</button>
+          </header>
+
+          <section class="view" id="dashboardView">
+            <div class="stats" id="stats"></div>
+            <div class="split-grid">
+              <section class="panel">
+                <div class="panel-head">
+                  <h3>Project completion</h3>
+                  <span id="overallProgressLabel">0%</span>
+                </div>
+                <div class="progress-track"><span id="overallProgressBar"></span></div>
+                <div class="list" id="progressList"></div>
+              </section>
+              <section class="panel">
+                <div class="panel-head">
+                  <h3>Upcoming and overdue</h3>
+                  <span id="taskAccess"></span>
+                </div>
+                <div class="list" id="dashboardTaskList"></div>
+              </section>
+            </div>
+          </section>
+
+          <section class="view hidden" id="projectsView">
+            <div class="split-grid projects-layout">
+              <section class="panel">
+                <div class="panel-head">
+                  <h3>Projects</h3>
+                  <span id="projectAccess"></span>
+                </div>
+                <div class="list" id="projectList"></div>
+              </section>
+              <section class="panel detail-panel" id="projectDetail"></section>
+            </div>
+          </section>
+
+          <section class="view hidden" id="tasksView">
+            <section class="panel">
+              <div class="panel-head">
+                <h3>Task board</h3>
+                <span>Assignment and status tracking</span>
+              </div>
+              <div class="list task-board" id="taskList"></div>
+            </section>
+          </section>
+
+          <section class="view hidden" id="teamView">
+            <div class="split-grid">
+              <section class="panel">
+                <div class="panel-head">
+                  <h3>Teams</h3>
+                  <span>Groups and leaders</span>
+                </div>
+                <div class="list" id="teamList"></div>
+              </section>
+              <section class="panel">
+                <div class="panel-head">
+                  <h3>Registered users</h3>
+                  <span>Available for teams</span>
+                </div>
+                <div class="list team-grid" id="userList"></div>
+              </section>
+            </div>
+          </section>
+        </section>
+      </section>
+
+      <div class="dialog hidden" id="projectDialog">
+        <form class="dialog-card form" id="projectForm">
+          <div class="panel-head">
+            <h3 id="projectFormTitle">Create project</h3>
+            <button class="icon-button ghost dialog-close" type="button">Close</button>
+          </div>
+          <input type="hidden" name="id">
+          <label>Project name <input name="name" required maxlength="120"></label>
+          <label>Description <textarea name="description" rows="4" maxlength="600"></textarea></label>
+          <label>Team <select name="teamId" id="projectTeam"></select></label>
+          <label>Team members <select name="memberIds" multiple id="projectMembers"></select></label>
+          <button type="submit">Save project</button>
+        </form>
+      </div>
+
+      <div class="dialog hidden" id="teamDialog">
+        <form class="dialog-card form" id="teamForm">
+          <div class="panel-head">
+            <h3 id="teamFormTitle">Create team</h3>
+            <button class="icon-button ghost dialog-close" type="button">Close</button>
+          </div>
+          <input type="hidden" name="id">
+          <label>Team name <input name="name" required maxlength="120"></label>
+          <label>Description <textarea name="description" rows="3" maxlength="500"></textarea></label>
+          <label>Team leader <select name="leaderId" id="teamLeader"></select></label>
+          <label>Members <select name="memberIds" multiple id="teamMembers"></select></label>
+          <button type="submit">Save team</button>
+        </form>
+      </div>
+
+      <div class="dialog hidden" id="taskDialog">
+        <form class="dialog-card form" id="taskForm">
+          <div class="panel-head">
+            <h3 id="taskFormTitle">Create task</h3>
+            <button class="icon-button ghost dialog-close" type="button">Close</button>
+          </div>
+          <input type="hidden" name="id">
+          <label>Title <input name="title" required maxlength="160"></label>
+          <label>Description <textarea name="description" rows="3" maxlength="800"></textarea></label>
+          <label>Project <select name="projectId" id="taskProject" required></select></label>
+          <label>Assign to <select name="assignedToId" id="taskAssignee"></select></label>
+          <label>Deadline <input name="deadline" type="date"></label>
+          <button type="submit">Save task</button>
+        </form>
+      </div>
+
+      <div class="toast" id="toast" role="status"></div>
+    </main>
+    <script src="/app.js"></script>
+  </body>
+</html>

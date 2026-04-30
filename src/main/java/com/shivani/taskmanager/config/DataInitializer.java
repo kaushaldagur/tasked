@@ -1,0 +1,53 @@
+package com.shivani.taskmanager.config;
+
+import com.shivani.taskmanager.model.Role;
+import com.shivani.taskmanager.model.User;
+import com.shivani.taskmanager.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Component;
+
+@Component
+public class DataInitializer implements CommandLineRunner {
+
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final String adminName;
+    private final String adminEmail;
+    private final String adminPassword;
+
+    public DataInitializer(
+        UserRepository userRepository,
+        PasswordEncoder passwordEncoder,
+        @Value("${app.admin.name:}") String adminName,
+        @Value("${app.admin.email:}") String adminEmail,
+        @Value("${app.admin.password:}") String adminPassword
+    ) {
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.adminName = adminName;
+        this.adminEmail = adminEmail;
+        this.adminPassword = adminPassword;
+    }
+
+    @Override
+    public void run(String... args) {
+        if (adminEmail == null || adminEmail.isBlank() || adminPassword == null || adminPassword.isBlank()) {
+            return;
+        }
+        userRepository.findByEmailIgnoreCase(adminEmail).ifPresentOrElse(existingAdmin -> {
+            if (existingAdmin.getRole() != Role.ADMIN) {
+                existingAdmin.setRole(Role.ADMIN);
+                userRepository.save(existingAdmin);
+            }
+        }, () -> {
+            User admin = new User();
+            admin.setName(adminName == null || adminName.isBlank() ? "Project Admin" : adminName);
+            admin.setEmail(adminEmail.toLowerCase());
+            admin.setPasswordHash(passwordEncoder.encode(adminPassword));
+            admin.setRole(Role.ADMIN);
+            userRepository.save(admin);
+        });
+    }
+}
