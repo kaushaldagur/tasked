@@ -1,4 +1,4 @@
-# WorkBoard v2
+# Taskboard KD
 
 WorkBoard is a role-based project and task management web app built with Spring Boot and a redesigned static frontend.
 
