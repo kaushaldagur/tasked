@@ -1,0 +1,3 @@
+# Railway / Nixpacks: align JVM with pom.xml (Java 17)
+[variables]
+NIXPACKS_JDK_VERSION = "17"
