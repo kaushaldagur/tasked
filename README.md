@@ -1,6 +1,6 @@
 # Taskboard KD
 https://gracious-communication-production.up.railway.app/
-WorkBoard is a role-based project and task management web app built with Spring Boot and a redesigned static frontend.
+This is a role-based project and task management web app built with Spring Boot and a redesigned static frontend.
 
 ## Highlights
 
