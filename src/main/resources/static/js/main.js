@@ -69,10 +69,10 @@ function setView(view) {
   $(`#${view}View`).classList.remove("hidden");
   $$(".nav-button").forEach((button) => button.classList.toggle("active", button.dataset.view === view));
   const titles = {
-    dashboard: ["Home", "Command center"],
-    projects: ["Projects", "Project navigator"],
-    tasks: ["Queue", "Task pipeline"],
-    team: ["People", "Team workspace"]
+    dashboard: ["Stats", "Dashboard"],
+    projects: ["Projects", "Dashboard"],
+    tasks: ["Tasks", "Dashboard"],
+    team: ["Team", "Dashboard"]
   };
   $("#viewEyebrow").textContent = titles[view][0];
   $("#viewTitle").textContent = titles[view][1];
@@ -88,8 +88,8 @@ function renderShell() {
 
   $("#welcomeTitle").textContent = state.session.user.name;
   $("#rolePill").textContent = state.session.user.role;
-  $("#projectAccess").textContent = isAdmin() ? "Open a project to update scope, people, and tasks" : "Projects you are currently mapped to";
-  $("#taskAccess").textContent = isAdmin() ? "All tasks in this workspace" : "Tasks assigned to your account";
+  $("#projectAccess").textContent = isAdmin() ? "Every workspace project with live task progress." : "Projects where you have assigned work.";
+  $("#taskAccess").textContent = isAdmin() ? "Full system view across users and projects." : "Your assigned work, filtered for focus.";
   setView(state.ui.activeView);
 }
 
@@ -161,6 +161,7 @@ function renderAnalytics() {
 }
 
 function renderProgress() {
+  if (!$("#overallProgressLabel") || !$("#overallProgressBar") || !$("#progressList")) return;
   const totalTasks = state.entities.tasks.length;
   const doneTasks = state.entities.tasks.filter((task) => task.status === "DONE").length;
   const overall = totalTasks ? Math.round((doneTasks / totalTasks) * 100) : 0;
@@ -183,6 +184,7 @@ function renderProgress() {
 }
 
 function renderDashboardTasks() {
+  if (!$("#dashboardTaskList")) return;
   const sorted = [...state.entities.tasks].sort((a, b) => (a.deadline || "9999-12-31").localeCompare(b.deadline || "9999-12-31")).slice(0, 6);
   $("#dashboardTaskList").innerHTML = sorted.length ? sorted.map(taskCard).join("") : emptyState("No tasks to track", "Assigned tasks and overdue work will appear here.");
 }
@@ -234,6 +236,17 @@ function renderProjects() {
     state.ui.selectedProjectId = state.entities.projects[0]?.id || null;
   }
 
+  const listPanel = $("#projectsListPanel");
+  const detailPanel = $("#projectDetail");
+  if (state.ui.projectDetailOpen && state.ui.selectedProjectId) {
+    listPanel.classList.add("hidden");
+    detailPanel.classList.remove("hidden");
+    renderProjectDetail();
+    return;
+  }
+
+  listPanel.classList.remove("hidden");
+  detailPanel.classList.add("hidden");
   $("#projectList").innerHTML = state.entities.projects.length ? state.entities.projects.map((project) => {
     const progress = projectProgress(project.id);
     return `
@@ -245,8 +258,7 @@ function renderProjects() {
         <span class="progress-track"><i style="width:${progress.percent}%"></i></span>
       </button>
     `;
-  }).join("") : emptyState("No projects yet", isAdmin() ? "Use New project to create one." : "You have not been added to a project yet.");
-  renderProjectDetail();
+  }).join("") : emptyState("No projects yet", isAdmin() ? "Use Add to create your first project." : "Assigned projects will appear here.");
 }
 
 function renderProjectDetail() {
@@ -258,8 +270,10 @@ function renderProjectDetail() {
   const progress = projectProgress(project.id);
   const tasks = projectTasks(project.id);
   $("#projectDetail").innerHTML = `
+    <button class="ghost small" data-back-projects type="button">Back</button>
     <div class="detail-head">
       <div>
+        <p class="eyebrow">Project</p>
         <h3>${escapeHtml(project.name)}</h3>
         <p>${escapeHtml(project.description || "No description added")}</p>
         <p class="meta">Team: ${escapeHtml(project.team?.name || "No team assigned")}${project.team?.leader ? ` · Leader: ${escapeHtml(project.team.leader.name)}` : ""}</p>
@@ -273,7 +287,7 @@ function renderProjectDetail() {
     <div class="section-title">Members</div>
     <div class="chip-row">${(project.members || []).map((member) => `<span class="chip">${escapeHtml(member.name)}</span>`).join("") || `<span class="meta">No members</span>`}</div>
     <div class="section-title">Project tasks</div>
-    <div class="list">${tasks.length ? tasks.map(taskCard).join("") : emptyState("No tasks for this project", isAdmin() ? "Create a task and assign it to a member." : "No assigned work yet.")}</div>
+    <div class="list task-list">${tasks.length ? tasks.map(taskRow).join("") : emptyState("No tasks for this project", "Tasks for this project will show here.")}</div>
   `;
 }
 
@@ -294,7 +308,8 @@ function getFilteredTasks() {
       return haystack.includes(lower);
     });
   }
-  if (status !== "ALL") filtered = filtered.filter((task) => task.status === status);
+  if (status === "DONE") filtered = filtered.filter((task) => task.status === "DONE");
+  if (status === "PENDING") filtered = filtered.filter((task) => task.status !== "DONE");
   if (projectId !== "ALL") filtered = filtered.filter((task) => String(task.project?.id) === String(projectId));
   if (priority !== "ALL") filtered = filtered.filter((task) => taskPriority(task) === priority);
 
@@ -310,29 +325,7 @@ function getFilteredTasks() {
 
 function renderTasks() {
   const tasks = getFilteredTasks();
-  if (!tasks.length) {
-    $("#taskList").innerHTML = emptyState("No matching tasks", "Try clearing filters or create new tasks.");
-    return;
-  }
-  const columns = [
-    ["TODO", "To do"],
-    ["IN_PROGRESS", "In progress"],
-    ["DONE", "Done"]
-  ];
-  $("#taskList").innerHTML = columns.map(([status, label]) => {
-    const bucket = tasks.filter((task) => task.status === status);
-    return `
-      <section class="kanban-column">
-        <header>
-          <h4>${label}</h4>
-          <span>${bucket.length}</span>
-        </header>
-        <div class="kanban-cards">
-          ${bucket.length ? bucket.map(taskCard).join("") : `<div class="empty-state"><span>No tasks</span></div>`}
-        </div>
-      </section>
-    `;
-  }).join("");
+  $("#taskList").innerHTML = tasks.length ? tasks.map(taskRow).join("") : emptyState("No tasks yet", "Tasks matching this filter will appear here.");
 }
 
 function taskCard(task) {
@@ -366,6 +359,24 @@ function taskCard(task) {
         </div>
       </div>
     </article>
+  `;
+}
+
+function taskRow(task) {
+  const status = task.status === "DONE" ? "done" : "pending";
+  const canManage = canManageTask(task);
+  return `
+    <div class="task-row">
+      <div class="task-main">
+        <strong>${escapeHtml(task.title)}</strong>
+        <span>${escapeHtml(task.project?.name || "No project")} · ${escapeHtml(task.assignedTo?.name || "Unassigned")}</span>
+      </div>
+      <div class="task-actions">
+        <span class="status ${status}">${status === "done" ? "Done" : "Pending"}</span>
+        ${task.status !== "DONE" ? `<button class="small" data-complete-task="${task.id}" type="button">Done</button>` : ""}
+        ${canManage ? `<button class="ghost small" data-edit-task="${task.id}" type="button">Edit</button>` : ""}
+      </div>
+    </div>
   `;
 }
 
@@ -649,10 +660,23 @@ $("#taskSearchInput").addEventListener("input", (event) => {
   state.ui.taskFilters.search = event.target.value;
   renderTasks();
 });
-$("#taskStatusFilter").addEventListener("change", (event) => {
-  state.ui.taskFilters.status = event.target.value;
-  renderTasks();
-});
+const taskStatusFilter = $("#taskStatusFilter");
+if (taskStatusFilter) {
+  taskStatusFilter.addEventListener("change", (event) => {
+    state.ui.taskFilters.status = event.target.value;
+    renderTasks();
+  });
+}
+const taskStatusButtons = $("#taskStatusButtons");
+if (taskStatusButtons) {
+  taskStatusButtons.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-status-filter]");
+    if (!button) return;
+    state.ui.taskFilters.status = button.dataset.statusFilter;
+    $$("#taskStatusButtons [data-status-filter]").forEach((el) => el.classList.toggle("active", el === button));
+    renderTasks();
+  });
+}
 const taskProjectFilter = $("#taskProjectFilter");
 if (taskProjectFilter) {
   taskProjectFilter.addEventListener("change", (event) => {
@@ -675,18 +699,18 @@ if (taskSortBy) {
   });
 }
 
-const bulkTodoButton = $("#bulkTodoButton");
-if (bulkTodoButton) bulkTodoButton.addEventListener("click", () => updateManyTaskStatuses("TODO"));
-const bulkInProgressButton = $("#bulkInProgressButton");
-if (bulkInProgressButton) bulkInProgressButton.addEventListener("click", () => updateManyTaskStatuses("IN_PROGRESS"));
-const bulkDoneButton = $("#bulkDoneButton");
-if (bulkDoneButton) bulkDoneButton.addEventListener("click", () => updateManyTaskStatuses("DONE"));
-
 document.addEventListener("click", async (event) => {
   const projectButton = event.target.closest("[data-project-id]");
   if (projectButton) {
     state.ui.selectedProjectId = Number(projectButton.dataset.projectId);
-    setView("projects");
+    state.ui.projectDetailOpen = true;
+    renderProjects();
+    return;
+  }
+
+  const backProjects = event.target.closest("[data-back-projects]");
+  if (backProjects) {
+    state.ui.projectDetailOpen = false;
     renderProjects();
     return;
   }
@@ -717,6 +741,14 @@ document.addEventListener("click", async (event) => {
     await api.deleteTask(deleteTask.dataset.deleteTask);
     await refresh();
     showToast("Task deleted.");
+    return;
+  }
+
+  const completeTask = event.target.closest("[data-complete-task]");
+  if (completeTask) {
+    await api.patchTaskStatus(completeTask.dataset.completeTask, "DONE");
+    await refresh();
+    showToast("Task marked done.");
     return;
   }
 

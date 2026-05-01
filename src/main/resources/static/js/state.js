@@ -13,8 +13,9 @@ export const state = {
     dashboard: null
   },
   ui: {
-    activeView: "dashboard",
+    activeView: "projects",
     selectedProjectId: null,
+    projectDetailOpen: false,
     selectedTaskIds: new Set(),
     theme: localStorage.getItem("theme") || "light",
     taskFilters: {

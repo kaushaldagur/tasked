@@ -31,121 +31,106 @@
       </section>
 
       <section class="app-view hidden" id="appView">
-        <header class="command-bar">
-          <div class="dock-top">
-            <p class="app-name">TaskForge</p>
-            <h1 id="welcomeTitle">Welcome</h1>
-          </div>
-          <nav class="nav nav-strip">
-            <button class="nav-button active" data-view="dashboard" type="button">Home</button>
-            <button class="nav-button" data-view="projects" type="button">Projects</button>
-            <button class="nav-button" data-view="tasks" type="button">Queue</button>
-            <button class="nav-button" data-view="team" type="button">People</button>
-          </nav>
-          <div class="dock-actions">
+        <header class="topbar">
+          <div class="brand">TaskFlow</div>
+          <nav class="desktop-nav" id="viewTitle">Dashboard</nav>
+          <div class="topbar-right">
+            <span>Hello, <strong id="welcomeTitle">User</strong></span>
             <span class="role-pill" id="rolePill"></span>
             <button class="ghost" id="themeToggle" type="button">Theme</button>
-            <button class="ghost" id="logoutButton" type="button">Logout</button>
+            <button class="ghost danger" id="logoutButton" type="button">Logout</button>
           </div>
         </header>
 
-        <section class="workspace frame">
+        <section class="dashboard">
+          <div class="tabs">
+            <button class="nav-button active" data-view="projects" type="button">Projects</button>
+            <button class="nav-button" data-view="tasks" type="button">Tasks</button>
+            <button class="nav-button" data-view="dashboard" type="button">Stats</button>
+            <button class="nav-button" data-view="team" type="button">Team</button>
+          </div>
+
           <header class="content-head">
             <div>
-              <p class="eyebrow" id="viewEyebrow">Dashboard</p>
-              <h2 id="viewTitle">Overview</h2>
+              <p class="eyebrow" id="viewEyebrow">Projects</p>
+              <h2>Workspace</h2>
             </div>
             <button id="primaryAction" type="button">New project</button>
           </header>
 
-          <section class="view" id="dashboardView">
+          <section class="view hidden" id="dashboardView">
             <section class="panel">
+              <div class="section-head">
+                <div>
+                  <h2>Stats</h2>
+                  <p>Global system metrics.</p>
+                </div>
+              </div>
               <div class="stats" id="stats"></div>
-            </section>
-            <section class="panel">
-              <div class="panel-head">
-                <h3>Progress lane</h3>
-                <span id="overallProgressLabel">0%</span>
-              </div>
-              <div class="progress-track"><span id="overallProgressBar"></span></div>
-              <div class="list" id="progressList"></div>
-            </section>
-            <section class="panel">
-              <div class="panel-head">
-                <h3>Attention queue</h3>
-                <span id="taskAccess"></span>
-              </div>
-              <div class="list" id="dashboardTaskList"></div>
             </section>
           </section>
 
-          <section class="view hidden" id="projectsView">
-            <div class="two-col">
-              <section class="panel">
-                <div class="panel-head">
-                  <h3>Project catalog</h3>
-                  <span id="projectAccess"></span>
+          <section class="view" id="projectsView">
+            <section class="panel" id="projectsListPanel">
+              <div class="section-head">
+                <div>
+                  <h2>Projects</h2>
+                  <p id="projectAccess">Every workspace project with live task progress.</p>
                 </div>
-                <div class="list" id="projectList"></div>
-              </section>
-              <section class="panel detail-panel" id="projectDetail"></section>
-            </div>
+              </div>
+              <div class="list cards-grid" id="projectList"></div>
+            </section>
+            <section class="panel detail-panel hidden" id="projectDetail"></section>
           </section>
 
           <section class="view hidden" id="tasksView">
             <section class="panel">
-              <div class="panel-head">
-                <h3>Tasks</h3>
-                <span>Kanban workflow</span>
+              <div class="section-head">
+                <div>
+                  <h2>Tasks</h2>
+                  <p id="taskAccess">Filter work and mark completion quickly.</p>
+                </div>
+              </div>
+              <div class="filters" id="taskStatusButtons">
+                <button class="small ghost active" data-status-filter="ALL" type="button">All</button>
+                <button class="small ghost" data-status-filter="PENDING" type="button">Pending</button>
+                <button class="small ghost" data-status-filter="DONE" type="button">Completed</button>
               </div>
               <div class="task-toolbar">
-                <label>Search <input id="taskSearchInput" type="text" placeholder="Search task"></label>
+                <label>Search <input id="taskSearchInput" type="text" placeholder="Search task title"></label>
                 <label>Project
                   <select id="taskProjectFilter">
                     <option value="ALL">All projects</option>
                   </select>
                 </label>
-                <label>Status
-                  <select id="taskStatusFilter">
-                    <option value="ALL">All</option>
-                    <option value="TODO">To do</option>
-                    <option value="IN_PROGRESS">In progress</option>
-                    <option value="DONE">Done</option>
-                  </select>
-                </label>
-                <label class="hidden">Priority
-                  <select id="taskPriorityFilter">
-                    <option value="ALL">All</option>
-                  </select>
-                </label>
-                <label class="hidden">Sort
-                  <select id="taskSortBy">
-                    <option value="deadline">Deadline</option>
-                  </select>
-                </label>
               </div>
-              <div class="list task-board" id="taskList"></div>
+              <div class="list task-list" id="taskList"></div>
             </section>
           </section>
 
           <section class="view hidden" id="teamView">
             <div class="two-col">
               <section class="panel">
-                <div class="panel-head">
-                  <h3>Teams</h3>
-                  <span>Leaders and members</span>
+                <div class="section-head">
+                  <div>
+                    <h2>Teams</h2>
+                    <p>Groups and leaders.</p>
+                  </div>
                 </div>
                 <div class="list" id="teamList"></div>
               </section>
               <section class="panel">
-                <div class="panel-head">
-                  <h3>Users</h3>
-                  <span>Available members</span>
+                <div class="section-head">
+                  <div>
+                    <h2>Users</h2>
+                    <p>Available members.</p>
+                  </div>
                 </div>
                 <div class="list team-grid" id="userList"></div>
               </section>
             </div>
           </section>
+
         </section>
       </section>
 
