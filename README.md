@@ -1,5 +1,5 @@
 # Taskboard KD
-
+https://gracious-communication-production.up.railway.app/
 WorkBoard is a role-based project and task management web app built with Spring Boot and a redesigned static frontend.
 
 ## Highlights
@@ -113,17 +113,3 @@ DEFAULT_ADMIN_PASSWORD=your-strong-password
 5. Deploy and open the generated domain.
 6. Login with the configured admin credentials.
 
-## Screenshots
-
-Add your own screenshots in `docs/screenshots/` and update this section:
-
-- `docs/screenshots/login.png` - login/signup screen
-- `docs/screenshots/dashboard.png` - dashboard and analytics panel
-- `docs/screenshots/tasks.png` - task board with filters and bulk actions
-- `docs/screenshots/dark-mode.png` - dark theme preview
-
-## Security + Submission Notes
-
-- Never commit real passwords or production credentials.
-- Keep production secrets in Railway variables.
-- Include your live URL, repo URL, and demo video in final submission.
