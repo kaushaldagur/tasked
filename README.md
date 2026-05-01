@@ -1,106 +1,79 @@
-# Taskboard KD
-https://gracious-communication-production.up.railway.app/
-This is a role-based project and task management web app built with Spring Boot and a redesigned static frontend.
+## Taskboard KD
 
-## Highlights
+A role-based project and task management web application built with Spring Boot and a modular static frontend.
 
-- New visual system: refreshed colors, spacing, cards, and typography
-- Dark mode toggle with persistent theme preference
-- Updated task board interactions: search, status filter, priority filter, sorting
-- Bulk task status updates for selected tasks
-- Task metadata feature: local priority and tags per task
-- Analytics panel for quick status/priority insights
-- Clearer validation messages on create/edit forms
-- Modular frontend architecture (`state`, `services`, `utils`, `main`)
+🔗 Live Demo: https://gracious-communication-production.up.railway.app/
 
-## Tech Stack
+⸻
 
-- Java 17
-- Spring Boot 3
-- Spring Security (BCrypt)
-- Spring Data JPA
-- H2 database (local)
-- PostgreSQL (Railway)
-- Static HTML/CSS/JavaScript served by Spring Boot
+Features
 
-## Frontend Architecture
+* Role-based access (Admin, Leader, Member)
+* Project and team management
+* Task creation, updates, and status tracking
+* Search, filter, and sorting for tasks
+* Bulk task status updates
+* Task priority and tags (local metadata)
+* Dashboard with analytics
+* Dark mode with saved preference
 
-The frontend is split into focused modules:
+⸻
 
-- `src/main/resources/static/js/state.js` - global state shape and UI filter state
-- `src/main/resources/static/js/services/api.js` - API service layer
-- `src/main/resources/static/js/services/task-meta.js` - local task metadata persistence (priority/tags)
-- `src/main/resources/static/js/utils.js` - shared utilities
-- `src/main/resources/static/js/main.js` - orchestration, rendering, and event handlers
+Tech Stack
 
-## Local Setup
+* Backend: Java 17, Spring Boot 3, Spring Security, Spring Data JPA
+* Frontend: HTML, CSS, JavaScript
+* Database: H2 (local), PostgreSQL (Railway)
 
-Run locally:
+⸻
 
-```bash
+Run Locally
+
 DEFAULT_ADMIN_NAME="Project Admin" \
 DEFAULT_ADMIN_EMAIL="your-admin-email@example.com" \
 DEFAULT_ADMIN_PASSWORD="your-strong-password" \
 PORT=8081 \
 ./mvnw spring-boot:run
-```
 
-Or use the permanent local script (fixed admin login):
+Or:
 
-```bash
 ./run-local.sh
-```
 
-Default local admin credentials from this script:
+Default Admin (local script):
+Email: admin@workboard.com
+Password: Admin@123
 
-- Email: `admin@workboard.com`
-- Password: `Admin@123`
+Open: http://localhost:8081
 
-Open:
+⸻
 
-```text
-http://localhost:8081
-```
+API
 
-Notes:
+All protected routes require:
 
-- Admin user is created from env vars on first run.
-- Signup creates `MEMBER` users only.
-- Local DB file: `data/taskmanager.mv.db`
-
-## Core User Flow
-
-1. Admin logs in.
-2. Members sign up.
-3. Admin creates teams and assigns leaders.
-4. Admin creates projects and links members.
-5. Admin/leader creates tasks.
-6. Members update task status.
-7. Team uses filters, sort, and bulk updates to manage work.
-8. Dashboard shows progress + analytics cards.
-
-## API Summary
-
-Use bearer token:
-
-```http
 Authorization: Bearer <token>
-```
 
-- Auth: `POST /api/auth/signup`, `POST /api/auth/login`, `GET /api/auth/me`, `GET /api/auth/users`
-- Projects: `GET /api/projects`, `POST /api/projects`, `PUT /api/projects/{id}`, `DELETE /api/projects/{id}`
-- Teams: `GET /api/teams`, `POST /api/teams`, `PUT /api/teams/{id}`, `DELETE /api/teams/{id}`
-- Tasks: `GET /api/tasks`, `POST /api/tasks`, `PUT /api/tasks/{id}`, `DELETE /api/tasks/{id}`, `PATCH /api/tasks/{id}/status`
-- Dashboard: `GET /api/dashboard`
+Auth
 
-## Railway Deployment
+* POST /api/auth/signup
+* POST /api/auth/login
+* GET /api/auth/me
 
-1. Create a Railway project.
-2. Connect your GitHub repository.
-3. Add a PostgreSQL service.
-4. Set variables:
+Projects / Teams / Tasks
 
-```env
+* Standard CRUD operations
+* PATCH /api/tasks/{id}/status
+
+Dashboard
+
+* GET /api/dashboard
+
+⸻
+
+Deployment (Railway)
+
+Set environment variables:
+
 JDBC_DATABASE_URL=jdbc:postgresql://HOST:PORT/DATABASE
 JDBC_DATABASE_USERNAME=DATABASE_USER
 JDBC_DATABASE_PASSWORD=DATABASE_PASSWORD
@@ -108,8 +81,15 @@ JDBC_DATABASE_DRIVER=org.postgresql.Driver
 DEFAULT_ADMIN_NAME=Project Admin
 DEFAULT_ADMIN_EMAIL=your-admin-email@example.com
 DEFAULT_ADMIN_PASSWORD=your-strong-password
-```
 
-5. Deploy and open the generated domain.
-6. Login with the configured admin credentials.
+Deploy and log in with the admin credentials.
 
+⸻
+
+Notes
+
+* Admin user is created on first run
+* Signup creates MEMBER users only
+* Change default credentials after deployment
+
+⸻
