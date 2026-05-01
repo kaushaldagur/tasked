@@ -194,6 +194,11 @@ function renderUsersAndProjects() {
   $("#teamLeader").innerHTML = `<option value="">No leader</option>` + members.map((user) => `<option value="${user.id}">${escapeHtml(user.name)}</option>`).join("");
   $("#teamMembers").innerHTML = members.map((user) => `<option value="${user.id}">${escapeHtml(user.name)} (${escapeHtml(user.email)})</option>`).join("");
   $("#taskProject").innerHTML = state.entities.projects.length ? state.entities.projects.map((project) => `<option value="${project.id}">${escapeHtml(project.name)}</option>`).join("") : `<option value="">Create a project first</option>`;
+  const filter = $("#taskProjectFilter");
+  if (filter) {
+    filter.innerHTML = `<option value="ALL">All projects</option>` + state.entities.projects.map((project) => `<option value="${project.id}">${escapeHtml(project.name)}</option>`).join("");
+    filter.value = state.ui.taskFilters.projectId;
+  }
   updateTaskAssigneeOptions();
 }
 
@@ -273,7 +278,7 @@ function renderProjectDetail() {
 }
 
 function getFilteredTasks() {
-  const { search, status, priority, sortBy } = state.ui.taskFilters;
+  const { search, status, projectId, priority, sortBy } = state.ui.taskFilters;
   const lower = search.trim().toLowerCase();
   let filtered = [...state.entities.tasks];
 
@@ -290,6 +295,7 @@ function getFilteredTasks() {
     });
   }
   if (status !== "ALL") filtered = filtered.filter((task) => task.status === status);
+  if (projectId !== "ALL") filtered = filtered.filter((task) => String(task.project?.id) === String(projectId));
   if (priority !== "ALL") filtered = filtered.filter((task) => taskPriority(task) === priority);
 
   const statusRank = { TODO: 0, IN_PROGRESS: 1, DONE: 2 };
@@ -304,9 +310,29 @@ function getFilteredTasks() {
 
 function renderTasks() {
   const tasks = getFilteredTasks();
-  $("#taskList").innerHTML = tasks.length ? tasks.map(taskCard).join("") : emptyState("No matching tasks", "Try clearing filters or create new tasks.");
-  const selectedCount = $("#selectedTaskCount");
-  if (selectedCount) selectedCount.textContent = `${state.ui.selectedTaskIds.size} selected`;
+  if (!tasks.length) {
+    $("#taskList").innerHTML = emptyState("No matching tasks", "Try clearing filters or create new tasks.");
+    return;
+  }
+  const columns = [
+    ["TODO", "To do"],
+    ["IN_PROGRESS", "In progress"],
+    ["DONE", "Done"]
+  ];
+  $("#taskList").innerHTML = columns.map(([status, label]) => {
+    const bucket = tasks.filter((task) => task.status === status);
+    return `
+      <section class="kanban-column">
+        <header>
+          <h4>${label}</h4>
+          <span>${bucket.length}</span>
+        </header>
+        <div class="kanban-cards">
+          ${bucket.length ? bucket.map(taskCard).join("") : `<div class="empty-state"><span>No tasks</span></div>`}
+        </div>
+      </section>
+    `;
+  }).join("");
 }
 
 function taskCard(task) {
@@ -314,7 +340,6 @@ function taskCard(task) {
   const statusClass = task.status === "DONE" ? "done" : overdue ? "warn" : "";
   const canManage = canManageTask(task);
   const meta = getTaskMeta(task.id);
-  const tags = meta.tags?.length ? meta.tags.map((tag) => `<span>${escapeHtml(tag)}</span>`).join("") : `<span>no tags</span>`;
   const priorityClass = meta.priority === "HIGH" ? "warn" : meta.priority === "LOW" ? "" : "done";
 
   return `
@@ -333,12 +358,7 @@ function taskCard(task) {
           <span>Due ${task.deadline || "not set"}</span>
           <span class="badge ${priorityClass}">Priority: ${meta.priority}</span>
         </div>
-        <div class="chip-row">${tags}</div>
         <div class="task-actions">
-          <label class="select-label">
-            <input type="checkbox" data-select-task="${task.id}" ${state.ui.selectedTaskIds.has(task.id) ? "checked" : ""}>
-            Select
-          </label>
           <select class="status-select" data-task-id="${task.id}">
             ${["TODO", "IN_PROGRESS", "DONE"].map((status) => `<option value="${status}" ${task.status === status ? "selected" : ""}>${status.replace("_", " ")}</option>`).join("")}
           </select>
@@ -633,6 +653,13 @@ $("#taskStatusFilter").addEventListener("change", (event) => {
   state.ui.taskFilters.status = event.target.value;
   renderTasks();
 });
+const taskProjectFilter = $("#taskProjectFilter");
+if (taskProjectFilter) {
+  taskProjectFilter.addEventListener("change", (event) => {
+    state.ui.taskFilters.projectId = event.target.value;
+    renderTasks();
+  });
+}
 const taskPriorityFilter = $("#taskPriorityFilter");
 if (taskPriorityFilter) {
   taskPriorityFilter.addEventListener("change", (event) => {
@@ -724,8 +751,6 @@ document.addEventListener("change", async (event) => {
     const id = Number(event.target.dataset.selectTask);
     if (event.target.checked) state.ui.selectedTaskIds.add(id);
     else state.ui.selectedTaskIds.delete(id);
-    const selectedCount = $("#selectedTaskCount");
-    if (selectedCount) selectedCount.textContent = `${state.ui.selectedTaskIds.size} selected`;
   }
 });
 

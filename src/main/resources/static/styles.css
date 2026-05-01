@@ -54,9 +54,11 @@ button {
   border: 0;
   border-radius: 10px;
   padding: 0.66rem 0.94rem;
+  min-height: 38px;
   background: var(--accent);
   color: #fff;
   font-weight: 700;
+  font-size: 0.92rem;
   cursor: pointer;
 }
 button:hover { background: var(--accent-strong); }
@@ -139,7 +141,7 @@ label { display: grid; gap: 6px; color: var(--muted); font-size: 0.9rem; font-we
 .frame {
   border: 1px solid var(--line);
   border-radius: 14px;
-  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  background: var(--surface);
   padding: 14px;
 }
 .content-head {
@@ -161,6 +163,8 @@ label { display: grid; gap: 6px; color: var(--muted); font-size: 0.9rem; font-we
   font-weight: 700;
 }
 .content-head h2, .panel h3, .detail-head h3 { margin: 0; }
+.content-head h2 { font-size: 1.24rem; }
+.panel h3, .detail-head h3 { font-size: 1.04rem; }
 
 .panel {
   border: 1px solid var(--line);
@@ -219,13 +223,59 @@ label { display: grid; gap: 6px; color: var(--muted); font-size: 0.9rem; font-we
   color: var(--ink);
   background: var(--surface-soft);
 }
+.project-card strong,
+.project-row strong,
+.task-card strong,
+.team-card strong {
+  line-height: 1.28;
+}
 .project-card:hover, .project-card.selected, .project-row:hover { border-color: var(--accent); }
 .project-row { grid-template-columns: minmax(0, 1fr) 120px auto; align-items: center; }
 .project-card span, .project-row span, .team-card div { display: grid; gap: 4px; min-width: 0; }
 
-.task-board { grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); }
+.task-board {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  align-items: start;
+}
 .team-grid { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+.kanban-column {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px;
+  background: var(--surface-soft);
+  display: grid;
+  gap: 10px;
+}
+.kanban-column header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.kanban-column h4 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+.kanban-column header span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+.kanban-cards {
+  display: grid;
+  gap: 8px;
+}
 .task-card p, .detail-head p { margin: 0; color: var(--muted); }
+.task-card p { line-height: 1.42; font-size: 0.9rem; }
 .task-card-top { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: start; }
 .task-card-main { display: grid; gap: 6px; min-width: 0; }
 .task-card-footer { display: grid; gap: 10px; }
@@ -247,7 +297,7 @@ label { display: grid; gap: 6px; color: var(--muted); font-size: 0.9rem; font-we
 }
 .task-actions {
   display: grid;
-  grid-template-columns: auto minmax(130px, 1fr) auto auto;
+  grid-template-columns: minmax(130px, 1fr) auto auto;
   gap: 8px;
   align-items: center;
 }
@@ -283,13 +333,13 @@ label { display: grid; gap: 6px; color: var(--muted); font-size: 0.9rem; font-we
   min-height: 27px;
   padding: 0 9px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  background: #e8ebff;
   color: var(--accent-strong);
   font-size: 0.74rem;
   font-weight: 700;
 }
-.badge.warn { background: color-mix(in srgb, var(--warn) 22%, var(--surface)); color: var(--warn); }
-.badge.done { background: color-mix(in srgb, var(--done) 22%, var(--surface)); color: var(--done); }
+.badge.warn { background: #fff1df; color: var(--warn); }
+.badge.done { background: #e6f7ef; color: var(--done); }
 
 .small { padding: 0.44rem 0.62rem; font-size: 0.79rem; }
 .danger { background: var(--danger); color: #fff; }
@@ -330,9 +380,10 @@ label { display: grid; gap: 6px; color: var(--muted); font-size: 0.9rem; font-we
 @media (max-width: 1080px) {
   .command-bar { grid-template-columns: 1fr; }
   .nav-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .dock-actions { justify-content: flex-start; }
+  .dock-actions { justify-content: flex-start; flex-wrap: wrap; }
   .two-col { grid-template-columns: 1fr; }
   .stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .task-board { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 760px) {
@@ -342,6 +393,10 @@ label { display: grid; gap: 6px; color: var(--muted); font-size: 0.9rem; font-we
     align-items: flex-start;
   }
   .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .nav-strip { grid-template-columns: 1fr; }
+  .dock-actions { width: 100%; }
+  .dock-actions button,
+  .dock-actions .role-pill { width: 100%; justify-content: center; }
   .project-row { grid-template-columns: 1fr; }
   .task-actions { grid-template-columns: 1fr 1fr; }
   .task-actions .status-select, .task-actions .select-label { grid-column: 1 / -1; }

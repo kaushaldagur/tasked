@@ -20,6 +20,7 @@ export const state = {
     taskFilters: {
       search: "",
       status: "ALL",
+      projectId: "ALL",
       priority: "ALL",
       sortBy: "deadline"
     }

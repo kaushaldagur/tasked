@@ -96,10 +96,15 @@
             <section class="panel">
               <div class="panel-head">
                 <h3>Tasks</h3>
-                <span>Filter and update status</span>
+                <span>Kanban workflow</span>
               </div>
               <div class="task-toolbar">
                 <label>Search <input id="taskSearchInput" type="text" placeholder="Search task"></label>
+                <label>Project
+                  <select id="taskProjectFilter">
+                    <option value="ALL">All projects</option>
+                  </select>
+                </label>
                 <label>Status
                   <select id="taskStatusFilter">
                     <option value="ALL">All</option>
@@ -118,12 +123,6 @@
                     <option value="deadline">Deadline</option>
                   </select>
                 </label>
-              </div>
-              <div class="bulk-actions">
-                <button class="ghost small" id="bulkTodoButton" type="button">Bulk TODO</button>
-                <button class="ghost small" id="bulkInProgressButton" type="button">Bulk IN PROGRESS</button>
-                <button class="ghost small" id="bulkDoneButton" type="button">Bulk DONE</button>
-                <span id="selectedTaskCount">0 selected</span>
               </div>
               <div class="list task-board" id="taskList"></div>
             </section>
