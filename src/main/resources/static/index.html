@@ -9,55 +9,50 @@
   <body>
     <main class="shell">
       <section class="auth-view" id="authView">
-        <div class="brand">
-          <p class="eyebrow">Team Task Manager</p>
-          <h1>WorkBoard</h1>
-          <p>Project planning, team assignment, task status tracking, overdue visibility, and role-based access in one deployable app.</p>
-          <div class="feature-strip">
-            <span>Signup/Login</span>
-            <span>Admin/Member RBAC</span>
-            <span>REST APIs</span>
-            <span>SQL database</span>
-            <span>Railway ready</span>
+        <div class="auth-panel auth-card">
+          <div class="auth-card-head">
+            <h2>Welcome back</h2>
+            <p>Login or create an account to continue.</p>
           </div>
-        </div>
-
-        <div class="auth-panel">
-          <div class="tabs">
+          <div class="tabs auth-switcher">
             <button class="tab active" id="loginTab" type="button">Login</button>
-            <button class="tab" id="signupTab" type="button">Member signup</button>
+            <button class="tab" id="signupTab" type="button">Sign up</button>
           </div>
 
-          <form id="loginForm" class="form">
-            <label>Email <input name="email" type="email" autocomplete="email" required></label>
-            <label>Password <input name="password" type="password" autocomplete="current-password" required></label>
-            <button type="submit">Login</button>
+          <form id="loginForm" class="form auth-form">
+            <label>Email address <input name="email" type="email" autocomplete="email" placeholder="you@example.com" required></label>
+            <label>Password <input name="password" type="password" autocomplete="current-password" placeholder="Enter your password" required></label>
+            <button type="submit">Sign in</button>
           </form>
 
-          <form id="signupForm" class="form hidden">
-            <label>Name <input name="name" type="text" autocomplete="name" required minlength="2"></label>
-            <label>Email <input name="email" type="email" autocomplete="email" required></label>
-            <label>Password <input name="password" type="password" autocomplete="new-password" required minlength="6"></label>
+          <form id="signupForm" class="form auth-form hidden">
+            <label>Full name <input name="name" type="text" autocomplete="name" placeholder="Your full name" required minlength="2"></label>
+            <label>Email address <input name="email" type="email" autocomplete="email" placeholder="you@example.com" required></label>
+            <label>Create password <input name="password" type="password" autocomplete="new-password" placeholder="At least 6 characters" required minlength="6"></label>
             <button type="submit">Create member account</button>
           </form>
         </div>
       </section>
 
       <section class="app-view hidden" id="appView">
-        <aside class="sidebar">
-          <div>
-            <p class="eyebrow">WorkBoard</p>
+        <header class="workspace-topbar">
+          <div class="workspace-title">
+            <p class="eyebrow">WorkBoard Console</p>
             <h1 id="welcomeTitle">Workspace</h1>
-            <span class="role-pill" id="rolePill"></span>
           </div>
-          <nav class="nav">
-            <button class="nav-button active" data-view="dashboard" type="button">Dashboard</button>
-            <button class="nav-button" data-view="projects" type="button">Projects</button>
-            <button class="nav-button" data-view="tasks" type="button">Tasks</button>
-            <button class="nav-button" data-view="team" type="button">Team</button>
-          </nav>
-          <button class="ghost" id="logoutButton" type="button">Logout</button>
-        </aside>
+          <div class="workspace-actions">
+            <span class="role-pill" id="rolePill"></span>
+            <button class="ghost" id="themeToggle" type="button">Toggle dark mode</button>
+            <button class="ghost" id="logoutButton" type="button">Logout</button>
+          </div>
+        </header>
+
+        <nav class="workspace-nav nav">
+          <button class="nav-button active" data-view="dashboard" type="button">Dashboard</button>
+          <button class="nav-button" data-view="projects" type="button">Projects</button>
+          <button class="nav-button" data-view="tasks" type="button">Tasks</button>
+          <button class="nav-button" data-view="team" type="button">Team</button>
+        </nav>
 
         <section class="main-panel">
           <header class="content-head">
@@ -107,6 +102,23 @@
               <div class="panel-head">
                 <h3>Task board</h3>
                 <span>Assignment and status tracking</span>
+              </div>
+              <div class="task-toolbar">
+                <label>Search <input id="taskSearchInput" type="text" placeholder="Search title, description, tag"></label>
+                <label>Status
+                  <select id="taskStatusFilter">
+                    <option value="ALL">All</option>
+                    <option value="TODO">To do</option>
+                    <option value="IN_PROGRESS">In progress</option>
+                    <option value="DONE">Done</option>
+                  </select>
+                </label>
+              </div>
+              <div class="bulk-actions">
+                <button class="ghost small" id="bulkTodoButton" type="button">Mark selected TODO</button>
+                <button class="ghost small" id="bulkInProgressButton" type="button">Mark selected IN PROGRESS</button>
+                <button class="ghost small" id="bulkDoneButton" type="button">Mark selected DONE</button>
+                <span id="selectedTaskCount">0 selected</span>
               </div>
               <div class="list task-board" id="taskList"></div>
             </section>
@@ -175,12 +187,20 @@
           <label>Project <select name="projectId" id="taskProject" required></select></label>
           <label>Assign to <select name="assignedToId" id="taskAssignee"></select></label>
           <label>Deadline <input name="deadline" type="date"></label>
+          <label>Priority
+            <select name="priority" id="taskPriority">
+              <option value="MEDIUM">Medium</option>
+              <option value="HIGH">High</option>
+              <option value="LOW">Low</option>
+            </select>
+          </label>
+          <label>Tags (comma separated) <input name="tags" id="taskTags" maxlength="180" placeholder="backend, bugfix, release"></label>
           <button type="submit">Save task</button>
         </form>
       </div>
 
       <div class="toast" id="toast" role="status"></div>
     </main>
-    <script src="/app.js"></script>
+    <script type="module" src="/js/main.js"></script>
   </body>
 </html>

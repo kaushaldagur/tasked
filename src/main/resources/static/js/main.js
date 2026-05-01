@@ -1,26 +1,9 @@
-const state = {
-  token: localStorage.getItem("token"),
-  user: JSON.parse(localStorage.getItem("user") || "null"),
-  users: [],
-  teams: [],
-  projects: [],
-  tasks: [],
-  dashboard: null,
-  activeView: "dashboard",
-  selectedProjectId: null
-};
+import { state, PRIORITY_ORDER } from "./state.js";
+import { $, $$, escapeHtml, formJson, selectedValues, todayIsoDate } from "./utils.js";
+import { createApi } from "./services/api.js";
+import { getTaskMeta, saveTaskMeta, removeMissingTaskMeta } from "./services/task-meta.js";
 
-const $ = (selector) => document.querySelector(selector);
-const $$ = (selector) => Array.from(document.querySelectorAll(selector));
-
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
+const api = createApi(() => state.session.token);
 
 function showToast(message) {
   const toast = $("#toast");
@@ -29,28 +12,12 @@ function showToast(message) {
   setTimeout(() => toast.classList.remove("show"), 2800);
 }
 
-async function api(path, options = {}) {
-  const response = await fetch(path, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(state.token ? { Authorization: `Bearer ${state.token}` } : {}),
-      ...(options.headers || {})
-    }
-  });
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(text || `Request failed: ${response.status}`);
-  }
-  return response.status === 204 ? null : response.json();
-}
-
 function isAdmin() {
-  return state.user?.role === "ADMIN";
+  return state.session.user?.role === "ADMIN";
 }
 
 function isProjectLeader(project) {
-  return Boolean(project?.team?.leader?.id && state.user?.id === project.team.leader.id);
+  return Boolean(project?.team?.leader?.id && state.session.user?.id === project.team.leader.id);
 }
 
 function canManageProjectTasks(project) {
@@ -62,29 +29,31 @@ function canManageTask(task) {
 }
 
 function canOpenPrimaryAction() {
-  if (state.activeView === "tasks") {
-    return isAdmin() || state.projects.some(isProjectLeader);
+  if (state.ui.activeView === "tasks") {
+    return isAdmin() || state.entities.projects.some(isProjectLeader);
   }
   return isAdmin();
 }
 
 function persistAuth(auth) {
-  state.token = auth.token;
-  state.user = auth.user;
+  state.session.token = auth.token;
+  state.session.user = auth.user;
   localStorage.setItem("token", auth.token);
   localStorage.setItem("user", JSON.stringify(auth.user));
 }
 
 function clearAuth() {
-  state.token = null;
-  state.user = null;
-  state.users = [];
-  state.teams = [];
-  state.projects = [];
-  state.tasks = [];
-  state.dashboard = null;
+  state.session.token = null;
+  state.session.user = null;
+  state.entities = { users: [], teams: [], projects: [], tasks: [], dashboard: null };
+  state.ui.selectedTaskIds.clear();
   localStorage.removeItem("token");
   localStorage.removeItem("user");
+}
+
+function applyTheme() {
+  document.documentElement.dataset.theme = state.ui.theme;
+  $("#themeToggle").textContent = state.ui.theme === "dark" ? "Use light mode" : "Use dark mode";
 }
 
 function toggleAuth(mode) {
@@ -92,12 +61,10 @@ function toggleAuth(mode) {
   $("#signupTab").classList.toggle("active", mode === "signup");
   $("#loginForm").classList.toggle("hidden", mode !== "login");
   $("#signupForm").classList.toggle("hidden", mode !== "signup");
-  $("#loginForm").reset();
-  $("#signupForm").reset();
 }
 
 function setView(view) {
-  state.activeView = view;
+  state.ui.activeView = view;
   $$(".view").forEach((el) => el.classList.add("hidden"));
   $(`#${view}View`).classList.remove("hidden");
   $$(".nav-button").forEach((button) => button.classList.toggle("active", button.dataset.view === view));
@@ -114,20 +81,20 @@ function setView(view) {
 }
 
 function renderShell() {
-  const loggedIn = Boolean(state.token && state.user);
+  const loggedIn = Boolean(state.session.token && state.session.user);
   $("#authView").classList.toggle("hidden", loggedIn);
   $("#appView").classList.toggle("hidden", !loggedIn);
   if (!loggedIn) return;
 
-  $("#welcomeTitle").textContent = state.user.name;
-  $("#rolePill").textContent = state.user.role;
+  $("#welcomeTitle").textContent = state.session.user.name;
+  $("#rolePill").textContent = state.session.user.role;
   $("#projectAccess").textContent = isAdmin() ? "Select a project to edit info, team, or tasks" : "Projects where you are a member";
   $("#taskAccess").textContent = isAdmin() ? "All workspace tasks" : "Tasks assigned to you";
-  setView(state.activeView);
+  setView(state.ui.activeView);
 }
 
 function projectTasks(projectId) {
-  return state.tasks.filter((task) => task.project?.id === projectId);
+  return state.entities.tasks.filter((task) => task.project?.id === projectId);
 }
 
 function projectProgress(projectId) {
@@ -137,8 +104,16 @@ function projectProgress(projectId) {
   return { total: tasks.length, done, percent: Math.round((done / tasks.length) * 100) };
 }
 
+function taskPriority(task) {
+  return getTaskMeta(task.id).priority;
+}
+
+function taskTags(task) {
+  return getTaskMeta(task.id).tags || [];
+}
+
 function renderStats() {
-  const dashboard = state.dashboard || { projects: 0, tasks: 0, todo: 0, inProgress: 0, done: 0, overdue: 0 };
+  const dashboard = state.entities.dashboard || { projects: 0, tasks: 0, todo: 0, inProgress: 0, done: 0, overdue: 0 };
   const items = [
     ["Projects", dashboard.projects],
     ["Tasks", dashboard.tasks],
@@ -155,14 +130,44 @@ function renderStats() {
   `).join("");
 }
 
+function renderAnalytics() {
+  const container = $("#analyticsGrid");
+  if (!container) return;
+  const list = state.entities.tasks;
+  const statusTotals = {
+    TODO: list.filter((task) => task.status === "TODO").length,
+    IN_PROGRESS: list.filter((task) => task.status === "IN_PROGRESS").length,
+    DONE: list.filter((task) => task.status === "DONE").length
+  };
+  const priorityTotals = {
+    HIGH: list.filter((task) => taskPriority(task) === "HIGH").length,
+    MEDIUM: list.filter((task) => taskPriority(task) === "MEDIUM").length,
+    LOW: list.filter((task) => taskPriority(task) === "LOW").length
+  };
+  const cards = [
+    ["TODO tasks", statusTotals.TODO],
+    ["In progress tasks", statusTotals.IN_PROGRESS],
+    ["Completed tasks", statusTotals.DONE],
+    ["High priority", priorityTotals.HIGH],
+    ["Medium priority", priorityTotals.MEDIUM],
+    ["Low priority", priorityTotals.LOW]
+  ];
+  container.innerHTML = cards.map(([label, count]) => `
+    <article class="stat">
+      <span>${label}</span>
+      <strong>${count}</strong>
+    </article>
+  `).join("");
+}
+
 function renderProgress() {
-  const totalTasks = state.tasks.length;
-  const doneTasks = state.tasks.filter((task) => task.status === "DONE").length;
+  const totalTasks = state.entities.tasks.length;
+  const doneTasks = state.entities.tasks.filter((task) => task.status === "DONE").length;
   const overall = totalTasks ? Math.round((doneTasks / totalTasks) * 100) : 0;
   $("#overallProgressLabel").textContent = `${overall}% complete`;
   $("#overallProgressBar").style.width = `${overall}%`;
 
-  $("#progressList").innerHTML = state.projects.length ? state.projects.map((project) => {
+  $("#progressList").innerHTML = state.entities.projects.length ? state.entities.projects.map((project) => {
     const progress = projectProgress(project.id);
     return `
       <button class="project-row" data-project-id="${project.id}" type="button">
@@ -178,22 +183,22 @@ function renderProgress() {
 }
 
 function renderDashboardTasks() {
-  const sorted = [...state.tasks].sort((a, b) => (a.deadline || "9999-12-31").localeCompare(b.deadline || "9999-12-31")).slice(0, 6);
+  const sorted = [...state.entities.tasks].sort((a, b) => (a.deadline || "9999-12-31").localeCompare(b.deadline || "9999-12-31")).slice(0, 6);
   $("#dashboardTaskList").innerHTML = sorted.length ? sorted.map(taskCard).join("") : emptyState("No tasks to track", "Assigned tasks and overdue work will appear here.");
 }
 
 function renderUsersAndProjects() {
-  const members = state.users.filter((user) => user.role === "MEMBER");
+  const members = state.entities.users.filter((user) => user.role === "MEMBER");
   $("#projectMembers").innerHTML = members.map((user) => `<option value="${user.id}">${escapeHtml(user.name)} (${escapeHtml(user.email)})</option>`).join("");
-  $("#projectTeam").innerHTML = `<option value="">No team</option>` + state.teams.map((team) => `<option value="${team.id}">${escapeHtml(team.name)}</option>`).join("");
+  $("#projectTeam").innerHTML = `<option value="">No team</option>` + state.entities.teams.map((team) => `<option value="${team.id}">${escapeHtml(team.name)}</option>`).join("");
   $("#teamLeader").innerHTML = `<option value="">No leader</option>` + members.map((user) => `<option value="${user.id}">${escapeHtml(user.name)}</option>`).join("");
   $("#teamMembers").innerHTML = members.map((user) => `<option value="${user.id}">${escapeHtml(user.name)} (${escapeHtml(user.email)})</option>`).join("");
-  $("#taskProject").innerHTML = state.projects.length ? state.projects.map((project) => `<option value="${project.id}">${escapeHtml(project.name)}</option>`).join("") : `<option value="">Create a project first</option>`;
+  $("#taskProject").innerHTML = state.entities.projects.length ? state.entities.projects.map((project) => `<option value="${project.id}">${escapeHtml(project.name)}</option>`).join("") : `<option value="">Create a project first</option>`;
   updateTaskAssigneeOptions();
 }
 
 function renderTeam() {
-  $("#teamList").innerHTML = state.teams.length ? state.teams.map((team) => `
+  $("#teamList").innerHTML = state.entities.teams.length ? state.entities.teams.map((team) => `
     <article class="team-card">
       <div>
         <strong>${escapeHtml(team.name)}</strong>
@@ -205,7 +210,7 @@ function renderTeam() {
     </article>
   `).join("") : emptyState("No teams yet", isAdmin() ? "Create teams, choose members, and assign a leader." : "You have not been added to a team yet.");
 
-  $("#userList").innerHTML = state.users.length ? state.users.map((user) => `
+  $("#userList").innerHTML = state.entities.users.length ? state.entities.users.map((user) => `
     <article class="team-card">
       <div>
         <strong>${escapeHtml(user.name)}</strong>
@@ -217,17 +222,17 @@ function renderTeam() {
 }
 
 function renderProjects() {
-  if (!state.selectedProjectId && state.projects.length) {
-    state.selectedProjectId = state.projects[0].id;
+  if (!state.ui.selectedProjectId && state.entities.projects.length) {
+    state.ui.selectedProjectId = state.entities.projects[0].id;
   }
-  if (state.selectedProjectId && !state.projects.some((project) => project.id === state.selectedProjectId)) {
-    state.selectedProjectId = state.projects[0]?.id || null;
+  if (state.ui.selectedProjectId && !state.entities.projects.some((project) => project.id === state.ui.selectedProjectId)) {
+    state.ui.selectedProjectId = state.entities.projects[0]?.id || null;
   }
 
-  $("#projectList").innerHTML = state.projects.length ? state.projects.map((project) => {
+  $("#projectList").innerHTML = state.entities.projects.length ? state.entities.projects.map((project) => {
     const progress = projectProgress(project.id);
     return `
-      <button class="project-card ${project.id === state.selectedProjectId ? "selected" : ""}" data-project-id="${project.id}" type="button">
+      <button class="project-card ${project.id === state.ui.selectedProjectId ? "selected" : ""}" data-project-id="${project.id}" type="button">
         <span>
           <strong>${escapeHtml(project.name)}</strong>
           <small>${escapeHtml(project.team?.name || "No team")} · ${(project.members || []).length} members · ${progress.total} tasks</small>
@@ -236,12 +241,11 @@ function renderProjects() {
       </button>
     `;
   }).join("") : emptyState("No projects yet", isAdmin() ? "Use New project to create one." : "You have not been added to a project yet.");
-
   renderProjectDetail();
 }
 
 function renderProjectDetail() {
-  const project = state.projects.find((item) => item.id === state.selectedProjectId);
+  const project = state.entities.projects.find((item) => item.id === state.ui.selectedProjectId);
   if (!project) {
     $("#projectDetail").innerHTML = emptyState("Select a project", "Project info, members, tasks, and completion will show here.");
     return;
@@ -268,14 +272,51 @@ function renderProjectDetail() {
   `;
 }
 
+function getFilteredTasks() {
+  const { search, status, priority, sortBy } = state.ui.taskFilters;
+  const lower = search.trim().toLowerCase();
+  let filtered = [...state.entities.tasks];
+
+  if (lower) {
+    filtered = filtered.filter((task) => {
+      const haystack = [
+        task.title,
+        task.description,
+        task.project?.name,
+        task.assignedTo?.name,
+        taskTags(task).join(",")
+      ].join(" ").toLowerCase();
+      return haystack.includes(lower);
+    });
+  }
+  if (status !== "ALL") filtered = filtered.filter((task) => task.status === status);
+  if (priority !== "ALL") filtered = filtered.filter((task) => taskPriority(task) === priority);
+
+  const statusRank = { TODO: 0, IN_PROGRESS: 1, DONE: 2 };
+  filtered.sort((a, b) => {
+    if (sortBy === "priority") return PRIORITY_ORDER[taskPriority(a)] - PRIORITY_ORDER[taskPriority(b)];
+    if (sortBy === "status") return statusRank[a.status] - statusRank[b.status];
+    if (sortBy === "title") return a.title.localeCompare(b.title);
+    return (a.deadline || "9999-12-31").localeCompare(b.deadline || "9999-12-31");
+  });
+  return filtered;
+}
+
 function renderTasks() {
-  $("#taskList").innerHTML = state.tasks.length ? state.tasks.map(taskCard).join("") : emptyState("No tasks yet", isAdmin() ? "Use New task to create and assign work." : "Tasks assigned to you will appear here.");
+  const tasks = getFilteredTasks();
+  $("#taskList").innerHTML = tasks.length ? tasks.map(taskCard).join("") : emptyState("No matching tasks", "Try clearing filters or create new tasks.");
+  const selectedCount = $("#selectedTaskCount");
+  if (selectedCount) selectedCount.textContent = `${state.ui.selectedTaskIds.size} selected`;
 }
 
 function taskCard(task) {
-  const overdue = task.deadline && task.deadline < new Date().toISOString().slice(0, 10) && task.status !== "DONE";
+  const overdue = task.deadline && task.deadline < todayIsoDate() && task.status !== "DONE";
   const statusClass = task.status === "DONE" ? "done" : overdue ? "warn" : "";
   const canManage = canManageTask(task);
+  const meta = getTaskMeta(task.id);
+  const tags = meta.tags?.length ? meta.tags.map((tag) => `<span>${escapeHtml(tag)}</span>`).join("") : `<span>no tags</span>`;
+  const priorityClass = meta.priority === "HIGH" ? "warn" : meta.priority === "LOW" ? "" : "done";
+
   return `
     <article class="task-card">
       <div class="task-card-top">
@@ -288,11 +329,16 @@ function taskCard(task) {
       <div class="task-card-footer">
         <div class="task-meta">
           <span>${escapeHtml(task.project?.name || "No project")}</span>
-          <span>${escapeHtml(task.project?.team?.name || "No team")}</span>
           <span>${escapeHtml(task.assignedTo?.name || "Unassigned")}</span>
           <span>Due ${task.deadline || "not set"}</span>
+          <span class="badge ${priorityClass}">Priority: ${meta.priority}</span>
         </div>
+        <div class="chip-row">${tags}</div>
         <div class="task-actions">
+          <label class="select-label">
+            <input type="checkbox" data-select-task="${task.id}" ${state.ui.selectedTaskIds.has(task.id) ? "checked" : ""}>
+            Select
+          </label>
           <select class="status-select" data-task-id="${task.id}">
             ${["TODO", "IN_PROGRESS", "DONE"].map((status) => `<option value="${status}" ${task.status === status ? "selected" : ""}>${status.replace("_", " ")}</option>`).join("")}
           </select>
@@ -308,9 +354,11 @@ function emptyState(title, message) {
 }
 
 function renderAll() {
+  applyTheme();
   renderShell();
-  if (!state.token) return;
+  if (!state.session.token) return;
   renderStats();
+  renderAnalytics();
   renderProgress();
   renderDashboardTasks();
   renderUsersAndProjects();
@@ -320,33 +368,27 @@ function renderAll() {
 }
 
 async function refresh() {
-  if (!state.token) {
+  if (!state.session.token) {
     renderAll();
     return;
   }
   try {
-    const [dashboard, users, teams, projects, tasks] = await Promise.all([
-      api("/api/dashboard"),
-      api("/api/auth/users"),
-      api("/api/teams"),
-      api("/api/projects"),
-      api("/api/tasks")
-    ]);
-    state.dashboard = dashboard;
-    state.users = users;
-    state.teams = teams;
-    state.projects = projects;
-    state.tasks = tasks;
+    const [dashboard, users, teams, projects, tasks] = await api.loadAll();
+    state.entities.dashboard = dashboard;
+    state.entities.users = users;
+    state.entities.teams = teams;
+    state.entities.projects = projects;
+    state.entities.tasks = tasks;
+    removeMissingTaskMeta(tasks.map((task) => task.id));
+    state.ui.selectedTaskIds.forEach((id) => {
+      if (!tasks.some((task) => task.id === id)) state.ui.selectedTaskIds.delete(id);
+    });
     renderAll();
   } catch (error) {
     clearAuth();
     renderAll();
     showToast("Please log in again.");
   }
-}
-
-function formJson(form) {
-  return Object.fromEntries(new FormData(form).entries());
 }
 
 function openProjectDialog(project = null) {
@@ -380,12 +422,13 @@ function openTeamDialog(team = null) {
 }
 
 function openTaskDialog(task = null) {
-  const manageableProjects = state.projects.filter(canManageProjectTasks);
+  const manageableProjects = state.entities.projects.filter(canManageProjectTasks);
   if (!manageableProjects.length) {
     showToast("Create a project before adding tasks.");
     return;
   }
-  const taskProject = task?.project || manageableProjects.find((project) => project.id === state.selectedProjectId) || manageableProjects[0];
+  const taskProject = task?.project || manageableProjects.find((project) => project.id === state.ui.selectedProjectId) || manageableProjects[0];
+  const meta = task ? getTaskMeta(task.id) : { priority: "MEDIUM", tags: [] };
   $("#taskForm").reset();
   $("#taskFormTitle").textContent = task ? "Edit task" : "Create task";
   $("#taskProject").innerHTML = manageableProjects.map((project) => `<option value="${project.id}">${escapeHtml(project.name)}</option>`).join("");
@@ -395,6 +438,8 @@ function openTaskDialog(task = null) {
   $("#taskForm").elements.projectId.value = taskProject.id;
   updateTaskAssigneeOptions(taskProject.id, task?.assignedTo?.id || "");
   $("#taskForm").elements.deadline.value = task?.deadline || "";
+  $("#taskPriority").value = meta.priority;
+  $("#taskTags").value = (meta.tags || []).join(", ");
   $("#taskDialog").classList.remove("hidden");
 }
 
@@ -403,11 +448,41 @@ function closeDialogs() {
 }
 
 function updateTaskAssigneeOptions(projectId = $("#taskProject")?.value, selectedId = $("#taskAssignee")?.value) {
-  const project = state.projects.find((item) => String(item.id) === String(projectId));
-  const members = project?.members?.length ? project.members : state.users.filter((user) => user.role === "MEMBER");
+  const project = state.entities.projects.find((item) => String(item.id) === String(projectId));
+  const members = project?.members?.length ? project.members : state.entities.users.filter((user) => user.role === "MEMBER");
   $("#taskAssignee").innerHTML = `<option value="">Unassigned</option>` + members.map((user) => `<option value="${user.id}">${escapeHtml(user.name)}</option>`).join("");
   $("#taskAssignee").value = selectedId && members.some((user) => String(user.id) === String(selectedId)) ? String(selectedId) : "";
 }
+
+function validateTaskPayload(form) {
+  if (!form.elements.title.value.trim()) return "Task title is required.";
+  if (form.elements.title.value.trim().length < 3) return "Task title must be at least 3 characters.";
+  if (!form.elements.projectId.value) return "Select a project for this task.";
+  return null;
+}
+
+async function updateManyTaskStatuses(status) {
+  const ids = Array.from(state.ui.selectedTaskIds);
+  if (!ids.length) {
+    showToast("Select at least one task for bulk updates.");
+    return;
+  }
+  try {
+    await Promise.all(ids.map((id) => api.patchTaskStatus(id, status)));
+    state.ui.selectedTaskIds.clear();
+    await refresh();
+    showToast(`Updated ${ids.length} task(s).`);
+  } catch (error) {
+    showToast("Bulk update failed. Check task permissions.");
+    await refresh();
+  }
+}
+
+$("#themeToggle").addEventListener("click", () => {
+  state.ui.theme = state.ui.theme === "dark" ? "light" : "dark";
+  localStorage.setItem("theme", state.ui.theme);
+  applyTheme();
+});
 
 $("#loginTab").addEventListener("click", () => toggleAuth("login"));
 $("#signupTab").addEventListener("click", () => toggleAuth("signup"));
@@ -415,7 +490,7 @@ $("#signupTab").addEventListener("click", () => toggleAuth("signup"));
 $("#loginForm").addEventListener("submit", async (event) => {
   event.preventDefault();
   try {
-    const auth = await api("/api/auth/login", { method: "POST", body: JSON.stringify(formJson(event.target)) });
+    const auth = await api.login(formJson(event.target));
     persistAuth(auth);
     event.target.reset();
     await refresh();
@@ -429,7 +504,7 @@ $("#signupForm").addEventListener("submit", async (event) => {
   try {
     const payload = formJson(event.target);
     payload.role = "MEMBER";
-    const auth = await api("/api/auth/signup", { method: "POST", body: JSON.stringify(payload) });
+    const auth = await api.signup(payload);
     persistAuth(auth);
     event.target.reset();
     await refresh();
@@ -450,13 +525,9 @@ $$(".nav-button").forEach((button) => {
 });
 
 $("#primaryAction").addEventListener("click", () => {
-  if (state.activeView === "tasks") {
-    openTaskDialog();
-  } else if (state.activeView === "team") {
-    openTeamDialog();
-  } else {
-    openProjectDialog();
-  }
+  if (state.ui.activeView === "tasks") return openTaskDialog();
+  if (state.ui.activeView === "team") return openTeamDialog();
+  return openProjectDialog();
 });
 
 $$(".dialog-close").forEach((button) => button.addEventListener("click", closeDialogs));
@@ -464,19 +535,20 @@ $$(".dialog-close").forEach((button) => button.addEventListener("click", closeDi
 $("#projectForm").addEventListener("submit", async (event) => {
   event.preventDefault();
   const form = event.target;
+  if (!form.elements.name.value.trim()) {
+    showToast("Project name is required.");
+    return;
+  }
   const payload = {
-    name: form.elements.name.value,
-    description: form.elements.description.value,
+    name: form.elements.name.value.trim(),
+    description: form.elements.description.value.trim(),
     teamId: form.elements.teamId.value ? Number(form.elements.teamId.value) : null,
-    memberIds: Array.from($("#projectMembers").selectedOptions).map((option) => Number(option.value))
+    memberIds: selectedValues($("#projectMembers"))
   };
   const id = form.elements.id.value;
   try {
-    const saved = await api(id ? `/api/projects/${id}` : "/api/projects", {
-      method: id ? "PUT" : "POST",
-      body: JSON.stringify(payload)
-    });
-    state.selectedProjectId = saved.id;
+    const saved = await api.saveProject(id, payload);
+    state.ui.selectedProjectId = saved.id;
     closeDialogs();
     await refresh();
     showToast(id ? "Project updated." : "Project created.");
@@ -485,36 +557,26 @@ $("#projectForm").addEventListener("submit", async (event) => {
   }
 });
 
-$("#projectTeam").addEventListener("change", (event) => {
-  const team = state.teams.find((item) => String(item.id) === event.target.value);
-  const memberIds = new Set((team?.members || []).map((member) => String(member.id)));
-  Array.from($("#projectMembers").options).forEach((option) => {
-    option.selected = memberIds.has(option.value);
-  });
-});
-
-$("#taskProject").addEventListener("change", (event) => updateTaskAssigneeOptions(event.target.value, ""));
-
 $("#teamForm").addEventListener("submit", async (event) => {
   event.preventDefault();
   const form = event.target;
-  const leaderId = form.elements.leaderId.value ? Number(form.elements.leaderId.value) : null;
-  const memberIds = Array.from($("#teamMembers").selectedOptions).map((option) => Number(option.value));
-  if (leaderId && !memberIds.includes(leaderId)) {
-    memberIds.push(leaderId);
+  if (!form.elements.name.value.trim()) {
+    showToast("Team name is required.");
+    return;
   }
+  const leaderId = form.elements.leaderId.value ? Number(form.elements.leaderId.value) : null;
+  const memberIds = selectedValues($("#teamMembers"));
+  if (leaderId && !memberIds.includes(leaderId)) memberIds.push(leaderId);
+
   const payload = {
-    name: form.elements.name.value,
-    description: form.elements.description.value,
+    name: form.elements.name.value.trim(),
+    description: form.elements.description.value.trim(),
     leaderId,
     memberIds
   };
   const id = form.elements.id.value;
   try {
-    await api(id ? `/api/teams/${id}` : "/api/teams", {
-      method: id ? "PUT" : "POST",
-      body: JSON.stringify(payload)
-    });
+    await api.saveTeam(id, payload);
     closeDialogs();
     await refresh();
     showToast(id ? "Team updated." : "Team created.");
@@ -526,34 +588,77 @@ $("#teamForm").addEventListener("submit", async (event) => {
 $("#taskForm").addEventListener("submit", async (event) => {
   event.preventDefault();
   const form = event.target;
+  const error = validateTaskPayload(form);
+  if (error) {
+    showToast(error);
+    return;
+  }
   const payload = {
-    title: form.elements.title.value,
-    description: form.elements.description.value,
+    title: form.elements.title.value.trim(),
+    description: form.elements.description.value.trim(),
     projectId: Number(form.elements.projectId.value),
     assignedToId: form.elements.assignedToId.value ? Number(form.elements.assignedToId.value) : null,
     deadline: form.elements.deadline.value || null,
     status: "TODO"
   };
   const id = form.elements.id.value;
-  const oldTask = state.tasks.find((task) => String(task.id) === id);
+  const oldTask = state.entities.tasks.find((task) => String(task.id) === id);
   if (oldTask) payload.status = oldTask.status;
   try {
-    await api(id ? `/api/tasks/${id}` : "/api/tasks", {
-      method: id ? "PUT" : "POST",
-      body: JSON.stringify(payload)
-    });
+    const savedTask = await api.saveTask(id, payload);
+    const tags = $("#taskTags").value.split(",").map((tag) => tag.trim()).filter(Boolean).slice(0, 8);
+    saveTaskMeta(savedTask.id, { priority: $("#taskPriority").value, tags });
     closeDialogs();
     await refresh();
     showToast(id ? "Task updated." : "Task created.");
-  } catch (error) {
+  } catch (saveError) {
     showToast("Could not save task.");
   }
 });
 
+$("#projectTeam").addEventListener("change", (event) => {
+  const team = state.entities.teams.find((item) => String(item.id) === event.target.value);
+  const memberIds = new Set((team?.members || []).map((member) => String(member.id)));
+  Array.from($("#projectMembers").options).forEach((option) => {
+    option.selected = memberIds.has(option.value);
+  });
+});
+
+$("#taskProject").addEventListener("change", (event) => updateTaskAssigneeOptions(event.target.value, ""));
+$("#taskSearchInput").addEventListener("input", (event) => {
+  state.ui.taskFilters.search = event.target.value;
+  renderTasks();
+});
+$("#taskStatusFilter").addEventListener("change", (event) => {
+  state.ui.taskFilters.status = event.target.value;
+  renderTasks();
+});
+const taskPriorityFilter = $("#taskPriorityFilter");
+if (taskPriorityFilter) {
+  taskPriorityFilter.addEventListener("change", (event) => {
+    state.ui.taskFilters.priority = event.target.value;
+    renderTasks();
+  });
+}
+const taskSortBy = $("#taskSortBy");
+if (taskSortBy) {
+  taskSortBy.addEventListener("change", (event) => {
+    state.ui.taskFilters.sortBy = event.target.value;
+    renderTasks();
+  });
+}
+
+const bulkTodoButton = $("#bulkTodoButton");
+if (bulkTodoButton) bulkTodoButton.addEventListener("click", () => updateManyTaskStatuses("TODO"));
+const bulkInProgressButton = $("#bulkInProgressButton");
+if (bulkInProgressButton) bulkInProgressButton.addEventListener("click", () => updateManyTaskStatuses("IN_PROGRESS"));
+const bulkDoneButton = $("#bulkDoneButton");
+if (bulkDoneButton) bulkDoneButton.addEventListener("click", () => updateManyTaskStatuses("DONE"));
+
 document.addEventListener("click", async (event) => {
   const projectButton = event.target.closest("[data-project-id]");
   if (projectButton) {
-    state.selectedProjectId = Number(projectButton.dataset.projectId);
+    state.ui.selectedProjectId = Number(projectButton.dataset.projectId);
     setView("projects");
     renderProjects();
     return;
@@ -561,14 +666,14 @@ document.addEventListener("click", async (event) => {
 
   const editProject = event.target.closest("[data-edit-project]");
   if (editProject) {
-    openProjectDialog(state.projects.find((project) => project.id === Number(editProject.dataset.editProject)));
+    openProjectDialog(state.entities.projects.find((project) => project.id === Number(editProject.dataset.editProject)));
     return;
   }
 
   const deleteProject = event.target.closest("[data-delete-project]");
   if (deleteProject && confirm("Delete this project and all of its tasks?")) {
-    await api(`/api/projects/${deleteProject.dataset.deleteProject}`, { method: "DELETE" });
-    state.selectedProjectId = null;
+    await api.deleteProject(deleteProject.dataset.deleteProject);
+    state.ui.selectedProjectId = null;
     await refresh();
     showToast("Project deleted.");
     return;
@@ -576,13 +681,13 @@ document.addEventListener("click", async (event) => {
 
   const editTask = event.target.closest("[data-edit-task]");
   if (editTask) {
-    openTaskDialog(state.tasks.find((task) => task.id === Number(editTask.dataset.editTask)));
+    openTaskDialog(state.entities.tasks.find((task) => task.id === Number(editTask.dataset.editTask)));
     return;
   }
 
   const deleteTask = event.target.closest("[data-delete-task]");
   if (deleteTask && confirm("Delete this task?")) {
-    await api(`/api/tasks/${deleteTask.dataset.deleteTask}`, { method: "DELETE" });
+    await api.deleteTask(deleteTask.dataset.deleteTask);
     await refresh();
     showToast("Task deleted.");
     return;
@@ -590,30 +695,37 @@ document.addEventListener("click", async (event) => {
 
   const editTeam = event.target.closest("[data-edit-team]");
   if (editTeam) {
-    openTeamDialog(state.teams.find((team) => team.id === Number(editTeam.dataset.editTeam)));
+    openTeamDialog(state.entities.teams.find((team) => team.id === Number(editTeam.dataset.editTeam)));
     return;
   }
 
   const deleteTeam = event.target.closest("[data-delete-team]");
   if (deleteTeam && confirm("Delete this team? Projects will keep their members but lose the team link.")) {
-    await api(`/api/teams/${deleteTeam.dataset.deleteTeam}`, { method: "DELETE" });
+    await api.deleteTeam(deleteTeam.dataset.deleteTeam);
     await refresh();
     showToast("Team deleted.");
   }
 });
 
 document.addEventListener("change", async (event) => {
-  if (!event.target.matches(".status-select")) return;
-  try {
-    await api(`/api/tasks/${event.target.dataset.taskId}/status`, {
-      method: "PATCH",
-      body: JSON.stringify({ status: event.target.value })
-    });
-    await refresh();
-    showToast("Task status updated.");
-  } catch (error) {
-    showToast("You cannot update this task.");
-    await refresh();
+  if (event.target.matches(".status-select")) {
+    try {
+      await api.patchTaskStatus(event.target.dataset.taskId, event.target.value);
+      await refresh();
+      showToast("Task status updated.");
+    } catch (error) {
+      showToast("You cannot update this task.");
+      await refresh();
+    }
+    return;
+  }
+
+  if (event.target.matches("[data-select-task]")) {
+    const id = Number(event.target.dataset.selectTask);
+    if (event.target.checked) state.ui.selectedTaskIds.add(id);
+    else state.ui.selectedTaskIds.delete(id);
+    const selectedCount = $("#selectedTaskCount");
+    if (selectedCount) selectedCount.textContent = `${state.ui.selectedTaskIds.size} selected`;
   }
 });
 

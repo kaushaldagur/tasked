@@ -1,28 +1,41 @@
-# WorkBoard Task Manager
+# WorkBoard v2
 
-WorkBoard is a role-based project and task management web app built for the assignment requirement:
+WorkBoard is a role-based project and task management web app built with Spring Boot and a redesigned static frontend.
 
-- Authentication with signup and login
-- Admin and Member role-based access
-- Team creation with selected members and a team leader
-- Project creation, project details, task assignment, task deletion, and status tracking
-- Dashboard for project completion, task status, and overdue work
-- REST APIs with SQL database relationships
-- Railway-ready deployment
+## Highlights
+
+- New visual system: refreshed colors, spacing, cards, and typography
+- Dark mode toggle with persistent theme preference
+- Updated task board interactions: search, status filter, priority filter, sorting
+- Bulk task status updates for selected tasks
+- Task metadata feature: local priority and tags per task
+- Analytics panel for quick status/priority insights
+- Clearer validation messages on create/edit forms
+- Modular frontend architecture (`state`, `services`, `utils`, `main`)
 
 ## Tech Stack
 
 - Java 17
-- Spring Boot
-- Spring Security password hashing with BCrypt
+- Spring Boot 3
+- Spring Security (BCrypt)
 - Spring Data JPA
-- H2 database for local development
-- PostgreSQL for Railway deployment
-- Static HTML, CSS, and JavaScript frontend served by Spring Boot
+- H2 database (local)
+- PostgreSQL (Railway)
+- Static HTML/CSS/JavaScript served by Spring Boot
+
+## Frontend Architecture
+
+The frontend is split into focused modules:
+
+- `src/main/resources/static/js/state.js` - global state shape and UI filter state
+- `src/main/resources/static/js/services/api.js` - API service layer
+- `src/main/resources/static/js/services/task-meta.js` - local task metadata persistence (priority/tags)
+- `src/main/resources/static/js/utils.js` - shared utilities
+- `src/main/resources/static/js/main.js` - orchestration, rendering, and event handlers
 
 ## Local Setup
 
-Start the app locally:
+Run locally:
 
 ```bash
 DEFAULT_ADMIN_NAME="Project Admin" \
@@ -32,101 +45,60 @@ PORT=8081 \
 ./mvnw spring-boot:run
 ```
 
+Or use the permanent local script (fixed admin login):
+
+```bash
+./run-local.sh
+```
+
+Default local admin credentials from this script:
+
+- Email: `admin@workboard.com`
+- Password: `Admin@123`
+
 Open:
 
 ```text
 http://localhost:8081
 ```
 
-The admin account is created from the environment variables above. Normal signup creates `MEMBER` users only.
+Notes:
 
-Local data is stored in:
+- Admin user is created from env vars on first run.
+- Signup creates `MEMBER` users only.
+- Local DB file: `data/taskmanager.mv.db`
 
-```text
-data/taskmanager.mv.db
-```
-
-## Main User Flow
+## Core User Flow
 
 1. Admin logs in.
-2. Members sign up from the signup tab.
-3. Admin creates teams from registered members.
-4. Admin assigns a team leader.
-5. Admin creates a project and links a team to it.
-6. Admin or the team leader creates tasks for project members.
-7. Members update their assigned task status.
-8. Dashboard shows counts, completion, and overdue tasks.
+2. Members sign up.
+3. Admin creates teams and assigns leaders.
+4. Admin creates projects and links members.
+5. Admin/leader creates tasks.
+6. Members update task status.
+7. Team uses filters, sort, and bulk updates to manage work.
+8. Dashboard shows progress + analytics cards.
 
-## REST API Summary
+## API Summary
 
-Authenticated requests use:
+Use bearer token:
 
 ```http
 Authorization: Bearer <token>
 ```
 
-Auth:
+- Auth: `POST /api/auth/signup`, `POST /api/auth/login`, `GET /api/auth/me`, `GET /api/auth/users`
+- Projects: `GET /api/projects`, `POST /api/projects`, `PUT /api/projects/{id}`, `DELETE /api/projects/{id}`
+- Teams: `GET /api/teams`, `POST /api/teams`, `PUT /api/teams/{id}`, `DELETE /api/teams/{id}`
+- Tasks: `GET /api/tasks`, `POST /api/tasks`, `PUT /api/tasks/{id}`, `DELETE /api/tasks/{id}`, `PATCH /api/tasks/{id}/status`
+- Dashboard: `GET /api/dashboard`
 
-- `POST /api/auth/signup`
-- `POST /api/auth/login`
-- `GET /api/auth/me`
-- `GET /api/auth/users`
+## Railway Deployment
 
-Projects:
-
-- `GET /api/projects`
-- `POST /api/projects`
-- `PUT /api/projects/{id}`
-- `DELETE /api/projects/{id}`
-- `POST /api/projects/{id}/members`
-
-Teams:
-
-- `GET /api/teams`
-- `POST /api/teams`
-- `PUT /api/teams/{id}`
-- `DELETE /api/teams/{id}`
-
-Tasks:
-
-- `GET /api/tasks`
-- `POST /api/tasks`
-- `PUT /api/tasks/{id}`
-- `DELETE /api/tasks/{id}`
-- `PATCH /api/tasks/{id}/status`
-
-Dashboard:
-
-- `GET /api/dashboard`
-
-## GitHub Submission Steps
-
-From the project folder:
-
-```bash
-git init
-git add .
-git commit -m "Build role-based project task manager"
-```
-
-Create a new GitHub repository, then connect and push:
-
-```bash
-git branch -M main
-git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO_NAME.git
-git push -u origin main
-```
-
-Use that GitHub repo URL in the assignment submission.
-
-## Railway Deployment Steps
-
-1. Go to Railway and create a new project.
-2. Choose `Deploy from GitHub repo`.
-3. Select this repository.
-4. Add a Railway PostgreSQL database to the project.
-5. Open the app service, then go to `Variables`.
-6. Add these variables:
+1. Create a Railway project.
+2. Connect your GitHub repository.
+3. Add a PostgreSQL service.
+4. Set variables:
 
 ```env
 JDBC_DATABASE_URL=jdbc:postgresql://HOST:PORT/DATABASE
@@ -138,22 +110,20 @@ DEFAULT_ADMIN_EMAIL=your-admin-email@example.com
 DEFAULT_ADMIN_PASSWORD=your-strong-password
 ```
 
-Use the PostgreSQL connection details shown by Railway for `HOST`, `PORT`, `DATABASE`, `DATABASE_USER`, and `DATABASE_PASSWORD`.
+5. Deploy and open the generated domain.
+6. Login with the configured admin credentials.
 
-7. Railway will build the app with Maven and start it using the `Procfile`.
-8. After deployment finishes, open the generated Railway domain.
-9. Login with the admin email and password you set in Railway variables.
+## Screenshots
 
-## Railway Notes
+Add your own screenshots in `docs/screenshots/` and update this section:
 
-- Do not put real passwords in GitHub.
-- Set production admin credentials only in Railway variables.
-- If you change admin variables after the admin user already exists, the app will not overwrite the existing password automatically. Create the desired admin credentials before the first production run, or update the database manually.
-- Signup users are members, not admins.
+- `docs/screenshots/login.png` - login/signup screen
+- `docs/screenshots/dashboard.png` - dashboard and analytics panel
+- `docs/screenshots/tasks.png` - task board with filters and bulk actions
+- `docs/screenshots/dark-mode.png` - dark theme preview
 
-## Assignment Submission Checklist
+## Security + Submission Notes
 
-- Live Application URL: your Railway public URL
-- GitHub Repo: your GitHub repository URL
-- README: this file
-- Demo Video: 2-5 minutes showing login, member signup, team creation, project creation, task assignment, status updates, delete actions, and dashboard progress
+- Never commit real passwords or production credentials.
+- Keep production secrets in Railway variables.
+- Include your live URL, repo URL, and demo video in final submission.
