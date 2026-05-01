@@ -69,10 +69,10 @@ function setView(view) {
   $(`#${view}View`).classList.remove("hidden");
   $$(".nav-button").forEach((button) => button.classList.toggle("active", button.dataset.view === view));
   const titles = {
-    dashboard: ["Dashboard", "Overview"],
-    projects: ["Projects", "Project details"],
-    tasks: ["Tasks", "Task board"],
-    team: ["Teams", "Team management"]
+    dashboard: ["Home", "Command center"],
+    projects: ["Projects", "Project navigator"],
+    tasks: ["Queue", "Task pipeline"],
+    team: ["People", "Team workspace"]
   };
   $("#viewEyebrow").textContent = titles[view][0];
   $("#viewTitle").textContent = titles[view][1];
@@ -88,8 +88,8 @@ function renderShell() {
 
   $("#welcomeTitle").textContent = state.session.user.name;
   $("#rolePill").textContent = state.session.user.role;
-  $("#projectAccess").textContent = isAdmin() ? "Select a project to edit info, team, or tasks" : "Projects where you are a member";
-  $("#taskAccess").textContent = isAdmin() ? "All workspace tasks" : "Tasks assigned to you";
+  $("#projectAccess").textContent = isAdmin() ? "Open a project to update scope, people, and tasks" : "Projects you are currently mapped to";
+  $("#taskAccess").textContent = isAdmin() ? "All tasks in this workspace" : "Tasks assigned to your account";
   setView(state.ui.activeView);
 }
 
