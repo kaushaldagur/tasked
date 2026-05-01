@@ -7,9 +7,13 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Component
 public class DataInitializer implements CommandLineRunner {
+
+    private static final Logger log = LoggerFactory.getLogger(DataInitializer.class);
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -37,8 +41,14 @@ public class DataInitializer implements CommandLineRunner {
     @Override
     public void run(String... args) {
         if (adminEmail == null || adminEmail.isBlank() || adminPassword == null || adminPassword.isBlank()) {
+            log.info("Admin bootstrap skipped (DEFAULT_ADMIN_EMAIL / DEFAULT_ADMIN_PASSWORD not set)");
             return;
         }
+        log.info(
+            "Admin bootstrap enabled for email='{}' (resetPasswordOnStartup={})",
+            adminEmail.trim().toLowerCase(),
+            resetAdminPasswordOnStartup
+        );
         userRepository.findByEmailIgnoreCase(adminEmail).ifPresentOrElse(existingAdmin -> {
             boolean changed = false;
             if (existingAdmin.getRole() != Role.ADMIN) {
@@ -55,6 +65,9 @@ public class DataInitializer implements CommandLineRunner {
             }
             if (changed) {
                 userRepository.save(existingAdmin);
+                log.info("Admin user updated in DB (email='{}')", existingAdmin.getEmail());
+            } else {
+                log.info("Admin user already up-to-date (email='{}')", existingAdmin.getEmail());
             }
         }, () -> {
             User admin = new User();
@@ -63,6 +76,7 @@ public class DataInitializer implements CommandLineRunner {
             admin.setPasswordHash(passwordEncoder.encode(adminPassword));
             admin.setRole(Role.ADMIN);
             userRepository.save(admin);
+            log.info("Admin user created in DB (email='{}')", admin.getEmail());
         });
     }
 }
